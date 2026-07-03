@@ -1,0 +1,21 @@
+{
+  "files": [
+    "rating1.png",
+    "rating2.jpg",
+    "rating3.png"
+  ],
+  "captions": {
+    "rating1.png": {
+      "text": "Absolutely insane quality — got it delivered in under 24 hours.",
+      "author": "~ Creator_X"
+    },
+    "rating2.jpg": {
+      "text": "My thumbnail CTR literally doubled after using this. Unreal.",
+      "author": "~ StreamerGG"
+    },
+    "rating3.png": {
+      "text": "The icon is exactly what I imagined. Super clean work!",
+      "author": "~ PixelPro"
+    }
+  }
+}

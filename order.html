@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order GFX — GFX Studio</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="index.html">GFX Studio</a>
+  <div class="nav-right">
+    <a class="btn btn-ghost btn-sm" href="order-status.html">Order Status</a>
+    <button id="theme-toggle" aria-label="Toggle theme"></button>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1 class="page-title">What can we make<br>for you?</h1>
+  <p class="page-sub">Choose the type of graphic you need — all completely free.</p>
+</div>
+
+<!-- Banner image (optional, place at assets/order-banner.png) -->
+<div class="order-banner reveal">
+  <img
+    src="assets/order-banner.png"
+    alt="Order Banner"
+    onerror="this.style.display='none'"
+  />
+</div>
+
+<div class="order-grid reveal">
+  <a class="order-type-card" href="order/thumbnail.html">
+    <div class="order-type-icon">🖼</div>
+    <div class="order-type-title">Thumbnail</div>
+    <div class="order-type-desc">Eye-catching YouTube or video thumbnails designed to maximize clicks.</div>
+    <div class="order-type-arrow">➔</div>
+  </a>
+
+  <a class="order-type-card" href="order/icon.html">
+    <div class="order-type-icon">✦</div>
+    <div class="order-type-title">Icon</div>
+    <div class="order-type-desc">Clean channel icons, avatars, and profile graphics that stand out.</div>
+    <div class="order-type-arrow">➔</div>
+  </a>
+
+  <a class="order-type-card" href="order/event-image.html">
+    <div class="order-type-icon">📅</div>
+    <div class="order-type-title">Event Image</div>
+    <div class="order-type-desc">Promotional visuals for streams, tournaments, and special events.</div>
+    <div class="order-type-arrow">➔</div>
+  </a>
+
+  <a class="order-type-card" href="order/banner.html">
+    <div class="order-type-icon">🎨</div>
+    <div class="order-type-title">Banner</div>
+    <div class="order-type-desc">Channel banners, Twitter headers, and social media cover art.</div>
+    <div class="order-type-arrow">➔</div>
+  </a>
+
+  <a class="order-type-card" href="order/profile-picture.html">
+    <div class="order-type-icon">👤</div>
+    <div class="order-type-title">Profile Picture</div>
+    <div class="order-type-desc">Professional profile pictures and avatars crafted just for you.</div>
+    <div class="order-type-arrow">➔</div>
+  </a>
+</div>
+
+<footer>
+  <p>© 2025 GFX Studio &nbsp;·&nbsp; All graphics are free</p>
+</footer>
+
+<div class="toast-wrap"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script>
+  "use strict";
+  initTheme();
+  initNav();
+  initReveal();
+</script>
+</body>
+</html>

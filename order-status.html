@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Status — Zauber GFX</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="index.html">Zauber GFX</a>
+  <div class="nav-right">
+    <a class="btn btn-ghost btn-sm" href="order.html">New Order</a>
+    <button id="theme-toggle" aria-label="Toggle theme"></button>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1 class="page-title">Your Orders</h1>
+  <p class="page-sub">Track the status of all your GFX requests in real time.</p>
+</div>
+
+<div class="status-page">
+  <div id="loadingState" style="text-align:center;padding:80px;color:var(--text-tertiary);">
+    <div class="spinner" style="width:36px;height:36px;margin:0 auto 20px;border-width:3px;color:var(--text-tertiary);"></div>
+    <p style="font-size:15px;">Loading your orders…</p>
+  </div>
+  <div class="status-empty" id="emptyState" style="display:none">
+    <div class="status-empty-icon">📭</div>
+    <p style="font-size:18px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">No orders yet</p>
+    <p style="font-size:15px;color:var(--text-secondary);margin-bottom:28px;">Get started by ordering your first GFX — it's completely free!</p>
+    <a class="btn btn-primary" href="order.html">Order GFX &nbsp;➔</a>
+  </div>
+  <div id="orderList" style="display:none"></div>
+</div>
+
+<footer><p>© 2025 Zauber GFX &nbsp;·&nbsp; All graphics are free</p></footer>
+<div class="toast-wrap"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script>
+"use strict";
+
+initTheme();
+initNav();
+
+const loading = document.getElementById("loadingState");
+const empty   = document.getElementById("emptyState");
+const list    = document.getElementById("orderList");
+
+// Init Firebase first, then auth
+getFirebaseApp();
+
+firebase.auth().onAuthStateChanged(async (user) => {
+  if (!user) {
+    try {
+      await firebase.auth().signInAnonymously();
+    } catch (err) {
+      loading.innerHTML = `<p style="color:var(--dot-red);font-size:15px;">Could not connect. Please refresh the page.</p>`;
+      console.error("Auth error:", err);
+    }
+    return; // onAuthStateChanged fires again after sign-in
+  }
+
+  const uid = user.uid;
+  const db  = firebase.firestore();
+
+  db.collection("orders")
+    .where("userId", "==", uid)
+    .orderBy("createdAt", "desc")
+    .onSnapshot((snap) => {
+      loading.style.display = "none";
+      if (snap.empty) {
+        empty.style.display = "block";
+        list.style.display  = "none";
+      } else {
+        empty.style.display = "none";
+        list.style.display  = "block";
+        renderOrders(snap.docs);
+      }
+    }, (err) => {
+      console.error("Firestore error:", err);
+      // Likely missing index — show empty state as fallback
+      loading.style.display = "none";
+      empty.style.display   = "block";
+    });
+});
+
+function renderOrders(docs) {
+  list.innerHTML = docs.map(doc => {
+    const d      = doc.data();
+    const id     = doc.id;
+    const status = d.status || "submitted";
+    const type   = (d.orderType || "GFX").replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase());
+    const date   = d.createdAt
+      ? new Date(d.createdAt).toLocaleDateString("de-DE", { day:"numeric", month:"short", year:"numeric" })
+      : "";
+
+    const s = STATUS[status] || STATUS.submitted;
+
+    return `
+      <div class="order-item" id="item-${id}">
+        <div class="order-item-header" onclick="toggle('${id}')">
+          <span class="status-dot ${s.dot}"></span>
+          <span class="order-item-title">${sanitize(d.title || "Untitled")}</span>
+          <span class="order-item-type">${sanitize(type)}</span>
+          <svg style="margin-left:auto;color:var(--text-tertiary);transition:.2s" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="chevron-${id}"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="order-item-body">
+          <p class="order-item-desc">${sanitize(d.description || "")}</p>
+          <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:14px;">
+            <span class="status-label">
+              <span class="status-dot ${s.dot}" style="width:8px;height:8px"></span>
+              <strong>${s.label}</strong>
+            </span>
+            ${date ? `<span style="font-size:13px;color:var(--text-tertiary)">${date}</span>` : ""}
+          </div>
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:${status === "done" ? "16px" : "0"}">${s.info}</p>
+          ${d.additional ? `<p style="font-size:13px;color:var(--text-tertiary);margin-top:10px;padding-top:10px;border-top:1px solid var(--border-2)">Note: ${sanitize(d.additional)}</p>` : ""}
+          ${status === "done" && d.resultUrl ? `
+            <div class="done-result" style="margin-top:16px">
+              <img src="${sanitize(d.resultUrl)}" alt="Your GFX" onerror="this.style.display='none'" />
+              <div class="done-result-info">
+                <p class="done-result-name">Your GFX is ready! 🎉</p>
+                <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 12px">Download in full quality below.</p>
+                <a class="btn btn-primary btn-sm" href="${sanitize(d.resultUrl)}" target="_blank" download>Download &nbsp;⬇</a>
+              </div>
+            </div>` : ""}
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function toggle(id) {
+  const el  = document.getElementById("item-" + id);
+  const chv = document.getElementById("chevron-" + id);
+  el?.classList.toggle("open");
+  if (chv) chv.style.transform = el?.classList.contains("open") ? "rotate(180deg)" : "";
+}
+</script>
+</body>
+</html>

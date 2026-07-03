@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zauber GFX — Custom Graphics</title>
+  <meta name="description" content="Professional GFX on demand. Thumbnails, icons, banners and more — free." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Navigation ── -->
+<nav class="nav">
+  <a class="nav-logo" href="index.html">Zauber GFX</a>
+  <div class="nav-right">
+    <a class="btn btn-ghost btn-sm" href="order-status.html">Order Status</a>
+    <button id="theme-toggle" aria-label="Toggle theme"></button>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <p class="hero-eyebrow">Free Custom Graphics</p>
+  <h1 class="hero-headline">Your Vision.<br>Our Design.</h1>
+  <p class="hero-sub">
+    Professional GFX crafted for creators — completely free.<br>Thumbnails, icons, banners, and more.
+  </p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="order.html">Order GFX &nbsp;➔</a>
+    <a class="btn btn-secondary" href="order-status.html">Track Order</a>
+  </div>
+</section>
+
+<!-- ── Showcase Image ── -->
+<section class="showcase">
+  <div class="showcase-main reveal">
+    <img
+      id="showcaseImg"
+      src="assets/hello.png"
+      alt="GFX Showcase"
+    />
+    <div class="showcase-main-placeholder" id="showcasePlaceholder" style="display:none;">
+      <span>Place showcase image at assets/showcase.png (1920×1080)</span>
+    </div>
+  </div>
+
+  <!-- ── Ratings Ticker ── -->
+  <div class="ratings-section reveal" style="width:100%">
+    <div class="ratings-track" id="ratingsTrack">
+      <!-- Filled by script.js -->
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats reveal">
+  <div class="stat-box">
+    <div class="stat-number" id="stat-orders">—</div>
+    <div class="stat-label">Orders Completed</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-number">100%</div>
+    <div class="stat-label">Free Forever</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-number">&lt;48h</div>
+    <div class="stat-label">Avg. Turnaround</div>
+  </div>
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+  <p>© 2026 Zauber GFX &nbsp;·&nbsp; All graphics are free</p>
+</footer>
+
+<div class="toast-wrap"></div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

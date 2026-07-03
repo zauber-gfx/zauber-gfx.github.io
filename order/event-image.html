@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Event Image — GFX Studio</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body data-order-type="event-image">
+
+<nav class="nav">
+  <a class="nav-logo" href="../index.html">GFX Studio</a>
+  <div class="nav-right">
+    <a class="btn btn-ghost btn-sm" href="../order-status.html">Order Status</a>
+    <button id="theme-toggle" aria-label="Toggle theme"></button>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1 class="page-title">Event Image</h1>
+  <p class="page-sub">Tell us everything about your vision and we'll create the perfect event-image.</p>
+</div>
+
+<div class="form-page">
+  <div class="form-card">
+
+    <form id="orderForm" novalidate>
+
+      <!-- Discord Username -->
+      <div class="field-group">
+        <div class="field-header">
+          <label class="field-label" for="discord">Discord Username</label>
+          <span class="field-required">*</span>
+        </div>
+        <p class="field-hint">Your Discord username so we can contact you when it's done.</p>
+        <input
+          class="field-input"
+          type="text"
+          id="discord"
+          name="discord"
+          placeholder="username#0000 or @username"
+          maxlength="64"
+          required
+          autocomplete="off"
+        />
+        <p class="field-error">Please enter your Discord username.</p>
+      </div>
+
+      <!-- Title -->
+      <div class="field-group">
+        <div class="field-header">
+          <label class="field-label" for="title">Title</label>
+          <span class="field-required">*</span>
+        </div>
+        <p class="field-hint">A short name for this order so you can find it in your order history.</p>
+        <input
+          class="field-input"
+          type="text"
+          id="title"
+          name="title"
+          placeholder="e.g. My Gaming Channel Event Image"
+          maxlength="80"
+          required
+          autocomplete="off"
+        />
+        <p class="field-error">Please give your order a title.</p>
+      </div>
+
+      <!-- Description -->
+      <div class="field-group">
+        <div class="field-header">
+          <label class="field-label" for="description">Describe your GFX</label>
+          <span class="field-required">*</span>
+        </div>
+        <p class="field-hint">Describe your event-image in as much detail as possible — style, colors, text, mood, subject, etc.</p>
+        <textarea
+          class="field-textarea"
+          id="description"
+          name="description"
+          placeholder="e.g. Dark gaming event-image with red and black theme, title text 'I Beat The Impossible Level', character on the left side looking shocked, dramatic lighting…"
+          maxlength="2000"
+          rows="6"
+          required
+        ></textarea>
+        <p class="field-error">Please describe what you need.</p>
+      </div>
+
+      <!-- Reference Images -->
+      <div class="field-group">
+        <div class="field-header">
+          <label class="field-label" for="referenceFiles">Reference Images</label>
+        </div>
+        <p class="field-hint">Upload images that show the style or mood you're going for. (Optional, max 5 × 10 MB, PNG/JPG/GIF/WEBP)</p>
+        <div class="file-drop" id="fileDrop">
+          <input
+            type="file"
+            id="referenceFiles"
+            name="referenceFiles"
+            accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
+            multiple
+          />
+          <div class="file-drop-icon">📎</div>
+          <p class="file-drop-text">Drop images here or click to browse</p>
+          <p class="file-drop-sub">PNG, JPG, GIF, WEBP — max 10 MB each</p>
+        </div>
+        <div class="file-preview" id="filePreview"></div>
+      </div>
+
+      <!-- Additional Info -->
+      <div class="field-group">
+        <div class="field-header">
+          <label class="field-label" for="additional">Additional Info</label>
+        </div>
+        <p class="field-hint">Anything else we should know? Fonts, deadlines, dos and don'ts.</p>
+        <textarea
+          class="field-textarea"
+          id="additional"
+          name="additional"
+          placeholder="Optional additional notes…"
+          maxlength="500"
+          rows="3"
+        ></textarea>
+      </div>
+
+      <div class="form-submit">
+        <button class="btn btn-primary" type="submit" id="submitBtn">
+          Submit Order &nbsp;➔
+        </button>
+      </div>
+    </form>
+
+    <!-- Success state (hidden until submit) -->
+    <div class="success-card" id="successCard">
+      <div class="success-icon">✅</div>
+      <h2 class="success-title">Order Submitted!</h2>
+      <p class="success-text">
+        Your event-image request is in the queue. Check your order status anytime.
+      </p>
+      <a class="btn btn-primary" href="../order-status.html">View Order Status &nbsp;➔</a>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <p>© 2025 GFX Studio &nbsp;·&nbsp; All graphics are free</p>
+</footer>
+
+<div class="toast-wrap"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/order-form.js"></script>
+</body>
+</html>

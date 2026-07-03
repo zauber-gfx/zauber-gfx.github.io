@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — GFX Studio</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- No link from any public page leads here -->
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-logo" href="index.html">GFX Studio</a>
+  <div class="nav-right">
+    <span id="adminEmail" style="font-size:13px;color:var(--text-tertiary)"></span>
+    <button id="logoutBtn" class="btn btn-ghost btn-sm" style="display:none">Sign out</button>
+    <button id="theme-toggle" aria-label="Toggle theme"></button>
+  </div>
+</nav>
+
+<!-- Auth wall (shown while not logged in or wrong account) -->
+<div class="auth-wall" id="authWall">
+  <div class="auth-card">
+    <div class="auth-icon">🔒</div>
+    <h1 class="auth-title">Admin Access</h1>
+    <p class="auth-sub">Sign in with the authorized Google account to access the admin panel.</p>
+    <button class="btn btn-primary" id="googleSignIn" style="width:100%;justify-content:center;">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#fff" d="M21.8 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.5c-.2 1.2-.9 2.2-2 2.9v2.4h3.2c1.9-1.7 3.1-4.3 3.1-7.1z"/><path fill="#fff" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2 1-3.5 1-2.7 0-4.9-1.8-5.7-4.2H3v2.5C4.7 19.8 8.1 22 12 22z"/><path fill="#fff" d="M6.3 13.9c-.2-.6-.3-1.2-.3-1.9s.1-1.3.3-1.9V7.6H3C2.4 8.8 2 10.4 2 12s.4 3.2 1 4.4l3.3-2.5z"/><path fill="#fff" d="M12 5.8c1.5 0 2.9.5 3.9 1.5l2.9-2.9C17 2.8 14.7 2 12 2 8.1 2 4.7 4.2 3 7.6l3.3 2.5C7.1 7.6 9.3 5.8 12 5.8z"/></svg>
+      Continue with Google
+    </button>
+    <p id="authError" style="color:var(--dot-red);font-size:13px;margin-top:12px;display:none"></p>
+  </div>
+</div>
+
+<!-- Admin panel (hidden until authenticated) -->
+<div id="adminPanel" style="display:none">
+  <div class="page-header">
+    <h1 class="page-title">All Orders</h1>
+  </div>
+
+  <div class="admin-wrapper">
+
+    <!-- Tabs -->
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchTab('orders')">📋 Orders</button>
+      <button class="admin-tab" onclick="switchTab('logs')">📜 Activity Log</button>
+    </div>
+
+    <!-- Orders Tab -->
+    <div id="tab-orders">
+      <div id="adminLoading" style="text-align:center;padding:40px;color:var(--text-tertiary);">
+        <div class="spinner" style="width:28px;height:28px;margin:0 auto 12px;color:var(--text-tertiary);"></div>
+        Loading orders…
+      </div>
+      <div id="adminOrderList"></div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div id="tab-logs" style="display:none">
+      <div class="log-wrap" id="logWrap">
+        <div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:13px;">Loading logs…</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <h2 class="modal-title">Delete Order?</h2>
+    <p class="modal-text">This permanently deletes the order for everyone — including the user's overview. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="danger-btn" id="confirmDeleteBtn">Delete permanently</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>© 2025 GFX Studio — Admin Panel</p>
+</footer>
+
+<div class="toast-wrap"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script>
+"use strict";
+
+// ── Security: no global access to admin functions ──
+(function () {
+  initTheme();
+  initNav();
+  getFirebaseApp();
+
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+  let _pendingDeleteId = null;
+  let _isAdmin = false;
+
+  // ── Auth state ──
+  auth.onAuthStateChanged((user) => {
+    if (user && user.email === ADMIN_EMAIL) {
+      _isAdmin = true;
+      document.getElementById("authWall").style.display   = "none";
+      document.getElementById("adminPanel").style.display = "block";
+      document.getElementById("adminEmail").textContent   = user.email;
+      document.getElementById("logoutBtn").style.display  = "inline-flex";
+      loadOrders();
+      loadLogs();
+    } else {
+      _isAdmin = false;
+      document.getElementById("authWall").style.display   = "flex";
+      document.getElementById("adminPanel").style.display = "none";
+      document.getElementById("adminEmail").textContent   = "";
+      document.getElementById("logoutBtn").style.display  = "none";
+      if (user && user.email !== ADMIN_EMAIL) {
+        document.getElementById("authError").style.display = "block";
+        document.getElementById("authError").textContent = "This Google account is not authorized.";
+        auth.signOut();
+      }
+    }
+  });
+
+  // Google sign in
+  document.getElementById("googleSignIn").addEventListener("click", async () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    try {
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      document.getElementById("authError").style.display = "block";
+      document.getElementById("authError").textContent = "Sign in failed. Please try again.";
+    }
+  });
+
+  // Logout
+  document.getElementById("logoutBtn").addEventListener("click", () => auth.signOut());
+
+  // ── Tab switching ──
+  window.switchTab = function (tab) {
+    ["orders", "logs"].forEach(t => {
+      document.getElementById("tab-" + t).style.display = t === tab ? "block" : "none";
+      document.querySelectorAll(".admin-tab")[t === "logs" ? 1 : 0]
+        .classList.toggle("active", t === tab ? true : false);
+    });
+    document.querySelectorAll(".admin-tab").forEach((btn, i) => {
+      btn.classList.toggle("active", (i === 0 && tab === "orders") || (i === 1 && tab === "logs"));
+    });
+  };
+
+  // ── Load all orders ──
+  function loadOrders() {
+    if (!_isAdmin) return;
+    db.collection("orders")
+      .orderBy("createdAt", "desc")
+      .onSnapshot((snap) => {
+        document.getElementById("adminLoading").style.display = "none";
+        const list = document.getElementById("adminOrderList");
+        if (snap.empty) {
+          list.innerHTML = `<p style="color:var(--text-tertiary);padding:20px;">No orders yet.</p>`;
+          return;
+        }
+        list.innerHTML = snap.docs.map(doc => renderAdminOrder(doc)).join("");
+      }, err => {
+        document.getElementById("adminLoading").innerHTML = `<p style="color:var(--dot-red)">Failed to load: ${err.message}</p>`;
+      });
+  }
+
+  function renderAdminOrder(doc) {
+    const d  = doc.data();
+    const id = doc.id;
+    const typeLabel = (d.orderType || "").replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    const date = d.createdAt ? new Date(d.createdAt).toLocaleString("de-DE") : "—";
+    const status = d.status || "submitted";
+
+    return `
+      <div class="admin-order-card" id="acard-${id}">
+        <div class="admin-order-header">
+          <span class="status-dot ${statusClass(status)}"></span>
+          <span class="admin-order-title">${sanitize(d.title || "Untitled")}</span>
+          <span class="order-item-type">${sanitize(typeLabel)}</span>
+          <span class="admin-order-meta">${date}</span>
+        </div>
+        <div class="admin-order-body">
+          <div class="meta-row"><span class="meta-key">Discord</span><span class="meta-val">${sanitize(d.discord || "—")}</span></div>
+          <div class="meta-row"><span class="meta-key">Description</span><span class="meta-val">${sanitize(d.description || "—")}</span></div>
+          ${d.additional ? `<div class="meta-row"><span class="meta-key">Additional</span><span class="meta-val">${sanitize(d.additional)}</span></div>` : ""}
+          ${d.referenceUrls?.length ? `<div class="meta-row"><span class="meta-key">References</span><span class="meta-val">${d.referenceUrls.map((u,i) => `<a href="${sanitize(u)}" target="_blank" style="color:var(--accent)">Image ${i+1}</a>`).join(", ")}</span></div>` : ""}
+          <div class="meta-row"><span class="meta-key">User ID</span><span class="meta-val" style="font-family:monospace;font-size:12px">${sanitize(d.userId || "—")}</span></div>
+
+          <!-- Status dropdown -->
+          <div class="admin-actions">
+            <select class="field-select" id="status-${id}" style="width:auto;min-width:160px" onchange="handleStatusChange('${id}', this.value)">
+              <option value="submitted" ${status==="submitted"?"selected":""}>🔴 Submitted</option>
+              <option value="in_work"   ${status==="in_work"  ?"selected":""}>🟠 In Work</option>
+              <option value="done"      ${status==="done"     ?"selected":""}>🟢 Done</option>
+            </select>
+
+            <button class="danger-btn" onclick="promptDelete('${id}')">Delete</button>
+          </div>
+
+          <!-- Done image upload (shown only when selecting "done") -->
+          <div class="done-upload-wrap ${status==="done"?"visible":""}" id="done-upload-${id}">
+            <p style="font-size:13px;color:var(--text-secondary);margin:12px 0 8px;">Upload the finished GFX to mark as Done:</p>
+            <div class="file-drop" style="padding:20px" id="doneFileDrop-${id}">
+              <input type="file" id="doneFile-${id}" accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp" onchange="handleDoneFile('${id}', this)" />
+              <p class="file-drop-text" style="margin:0">Drop result image or click to browse</p>
+            </div>
+            <div id="doneFileInfo-${id}" style="margin-top:8px;font-size:13px;color:var(--text-secondary)"></div>
+            <button class="btn btn-primary" style="margin-top:12px" onclick="submitDone('${id}')" id="doneBtn-${id}" disabled>
+              Mark as Done &nbsp;✓
+            </button>
+          </div>
+
+          ${status==="done" && d.resultUrl ? `<div style="margin-top:12px"><a href="${sanitize(d.resultUrl)}" target="_blank" class="btn btn-secondary btn-sm">View Result ↗</a></div>` : ""}
+        </div>
+      </div>`;
+  }
+
+  // ── Status change handler ──
+  window._doneFiles = {};
+
+  window.handleStatusChange = function (id, val) {
+    const wrap = document.getElementById("done-upload-" + id);
+    if (val === "done") {
+      wrap?.classList.add("visible");
+    } else {
+      wrap?.classList.remove("visible");
+      // Immediately update status for non-done states
+      updateOrderStatus(id, val, null);
+    }
+  };
+
+  window.handleDoneFile = function (id, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const ALLOWED = ["image/png","image/jpeg","image/jpg","image/gif","image/webp"];
+    if (!ALLOWED.includes(file.type)) {
+      showToast("Only image files allowed.");
+      input.value = "";
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      showToast("File too large (max 50 MB).");
+      input.value = "";
+      return;
+    }
+    window._doneFiles[id] = file;
+    document.getElementById("doneFileInfo-" + id).textContent = `📎 ${sanitize(file.name)} (${(file.size/1024/1024).toFixed(1)} MB)`;
+    document.getElementById("doneBtn-" + id).disabled = false;
+  };
+
+  window.submitDone = async function (id) {
+    if (!_isAdmin) return;
+    const file = window._doneFiles[id];
+    if (!file) { showToast("Please select an image first."); return; }
+
+    const btn = document.getElementById("doneBtn-" + id);
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Uploading…`;
+
+    try {
+      const b64 = await fileToBase64(file);
+      const user = auth.currentUser;
+      const idToken = await user.getIdToken();
+
+      const res = await fetch(`${WORKER_URL}/admin/set-done`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          orderId: id,
+          fileName: file.name,
+          fileType: file.type,
+          data: b64
+        })
+      });
+
+      if (!res.ok) throw new Error("Upload failed");
+      showToast("Order marked as Done ✓");
+      adminLog("success", `Marked order ${id} as Done`);
+    } catch (err) {
+      showToast("Failed: " + err.message);
+      btn.disabled = false;
+      btn.innerHTML = "Mark as Done &nbsp;✓";
+    }
+  };
+
+  async function updateOrderStatus(id, status, resultUrl) {
+    if (!_isAdmin) return;
+    try {
+      const user = auth.currentUser;
+      const idToken = await user.getIdToken();
+      const res = await fetch(`${WORKER_URL}/admin/update-status`, {
+        method: "POST",
+        headers: { "Content-Type":"application/json", "Authorization":`Bearer ${idToken}` },
+        body: JSON.stringify({ orderId: id, status, resultUrl })
+      });
+      if (!res.ok) throw new Error("Update failed");
+      showToast(`Status updated to ${status}`);
+      adminLog("success", `Updated order ${id} to ${status}`);
+    } catch (err) {
+      showToast("Failed: " + err.message);
+    }
+  }
+
+  // ── Delete ──
+  window.promptDelete = function (id) {
+    _pendingDeleteId = id;
+    openModal("deleteModal");
+  };
+
+  document.getElementById("confirmDeleteBtn").addEventListener("click", async () => {
+    if (!_isAdmin || !_pendingDeleteId) return;
+    closeModal("deleteModal");
+    const id = _pendingDeleteId;
+    _pendingDeleteId = null;
+    try {
+      const user = auth.currentUser;
+      const idToken = await user.getIdToken();
+      const res = await fetch(`${WORKER_URL}/admin/delete-order`, {
+        method: "POST",
+        headers: { "Content-Type":"application/json", "Authorization":`Bearer ${idToken}` },
+        body: JSON.stringify({ orderId: id })
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      showToast("Order deleted.");
+      adminLog("warn", `Deleted order ${id}`);
+    } catch (err) {
+      showToast("Failed: " + err.message);
+    }
+  });
+
+  // ── Admin Activity Log ──
+  function loadLogs() {
+    if (!_isAdmin) return;
+    db.collection("admin_logs")
+      .orderBy("timestamp", "desc")
+      .limit(200)
+      .onSnapshot((snap) => {
+        const wrap = document.getElementById("logWrap");
+        if (snap.empty) { wrap.innerHTML = `<div style="padding:16px;color:var(--text-tertiary);font-size:13px;">No activity yet.</div>`; return; }
+        wrap.innerHTML = `<div class="log-list">${snap.docs.map(doc => {
+          const d = doc.data();
+          const t = d.timestamp?.toDate?.() || new Date();
+          const timeStr = t.toLocaleString("de-DE");
+          const level = d.level || "info";
+          return `<div class="log-entry"><span class="log-time">${timeStr}</span><span class="log-msg ${level}">${sanitize(d.message || "")}</span></div>`;
+        }).join("")}</div>`;
+      });
+  }
+
+  async function adminLog(level, message) {
+    try {
+      await db.collection("admin_logs").add({
+        level,
+        message,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (_) {}
+  }
+
+  // ── Helpers ──
+  function statusClass(s) {
+    return { submitted:"submitted", in_work:"in-work", done:"done" }[s] || "submitted";
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload  = () => resolve(r.result.split(",")[1]);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+})();
+</script>
+</body>
+</html>

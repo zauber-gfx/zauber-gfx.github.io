@@ -16,12 +16,47 @@ const FIREBASE_CONFIG = {
 const WORKER_URL  = "https://sparkling-credit-cb26.julian-neustadtresponse.workers.dev";
 const ADMIN_EMAIL = "rechts-glamour.0a@icloud.com";
 
-// ── Init Firebase (safe to call multiple times) ──
+const STATUS = {
+  submitted: { label: "Submitted", dot: "submitted", info: "Your order is in the queue." },
+  in_work:   { label: "In Work",   dot: "in-work",   info: "We're currently working on your GFX!" },
+  done:      { label: "Done",      dot: "done",       info: "Your GFX is complete and ready to download!" }
+};
+
+// ── Init Firebase ──
 function getFirebaseApp() {
   if (!firebase.apps || !firebase.apps.length) {
     firebase.initializeApp(FIREBASE_CONFIG);
+    // Persist auth across tabs and page reloads
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
   }
   return firebase.app();
+}
+
+// ── Get or create anonymous user — always same UID per browser ──
+function getUserId() {
+  getFirebaseApp();
+  const auth = firebase.auth();
+  return new Promise((resolve, reject) => {
+    // onAuthStateChanged fires immediately if already signed in
+    const unsub = auth.onAuthStateChanged(async (user) => {
+      unsub();
+      if (user) {
+        // Already signed in — return existing UID
+        console.log("[Auth] Existing user:", user.uid, "isAnon:", user.isAnonymous);
+        resolve(user.uid);
+      } else {
+        // Not signed in — create anonymous session
+        try {
+          const cred = await auth.signInAnonymously();
+          console.log("[Auth] New anonymous user:", cred.user.uid);
+          resolve(cred.user.uid);
+        } catch (err) {
+          console.error("[Auth] signInAnonymously failed:", err);
+          reject(err);
+        }
+      }
+    });
+  });
 }
 
 // ── Theme ──
@@ -52,22 +87,15 @@ function updateThemeIcon(theme) {
 // ── Toast ──
 function showToast(msg, duration = 3500) {
   let wrap = document.querySelector(".toast-wrap");
-  if (!wrap) {
-    wrap = document.createElement("div");
-    wrap.className = "toast-wrap";
-    document.body.appendChild(wrap);
-  }
+  if (!wrap) { wrap = document.createElement("div"); wrap.className = "toast-wrap"; document.body.appendChild(wrap); }
   const toast = document.createElement("div");
   toast.className = "toast";
   toast.textContent = msg;
   wrap.appendChild(toast);
-  setTimeout(() => {
-    toast.classList.add("out");
-    toast.addEventListener("animationend", () => toast.remove(), { once: true });
-  }, duration);
+  setTimeout(() => { toast.classList.add("out"); toast.addEventListener("animationend", () => toast.remove(), { once: true }); }, duration);
 }
 
-// ── XSS sanitizer (display only) ──
+// ── Sanitize ──
 function sanitize(str) {
   if (typeof str !== "string") return "";
   const d = document.createElement("div");
@@ -75,21 +103,12 @@ function sanitize(str) {
   return d.innerHTML;
 }
 
-// ── Status helpers ──
-const STATUS = {
-  submitted: { label: "Submitted", dot: "submitted", info: "Your order is in the queue." },
-  in_work:   { label: "In Work",   dot: "in-work",   info: "We're currently working on your GFX!" },
-  done:      { label: "Done",      dot: "done",       info: "Your GFX is complete and ready to download!" }
-};
-
 // ── Scroll reveal ──
 function initReveal() {
   const els = document.querySelectorAll(".reveal");
   if (!els.length) return;
   const io = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) { e.target.classList.add("visible"); io.unobserve(e.target); }
-    });
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("visible"); io.unobserve(e.target); } });
   }, { threshold: 0.08 });
   els.forEach(el => io.observe(el));
 }
@@ -102,24 +121,3 @@ function initNav() {
 // ── Modal ──
 function openModal(id)  { document.getElementById(id)?.classList.add("open"); }
 function closeModal(id) { document.getElementById(id)?.classList.remove("open"); }
-
-// ── Anonymous Auth — persistent per browser ──
-async function getUserId() {
-  getFirebaseApp();
-  const auth = firebase.auth();
-  return new Promise((resolve, reject) => {
-    const unsub = auth.onAuthStateChanged(async (user) => {
-      unsub();
-      if (user) {
-        resolve(user.uid);
-      } else {
-        try {
-          const cred = await auth.signInAnonymously();
-          resolve(cred.user.uid);
-        } catch (err) {
-          reject(err);
-        }
-      }
-    });
-  });
-}

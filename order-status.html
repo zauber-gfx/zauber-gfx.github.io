@@ -33,6 +33,10 @@
     <a class="btn btn-primary" href="order.html">Order GFX &nbsp;➔</a>
   </div>
   <div id="orderList" style="display:none"></div>
+  <div id="errorState" style="display:none;text-align:center;padding:40px">
+    <p style="color:var(--dot-red);font-size:15px;margin-bottom:8px" id="errorMsg"></p>
+    <button class="btn btn-secondary" onclick="location.reload()">Retry</button>
+  </div>
 </div>
 
 <footer><p>© 2025 Zauber GFX &nbsp;·&nbsp; All graphics are free</p></footer>
@@ -44,50 +48,58 @@
 <script src="js/firebase-config.js"></script>
 <script>
 "use strict";
-
 initTheme();
 initNav();
-
-const loading = document.getElementById("loadingState");
-const empty   = document.getElementById("emptyState");
-const list    = document.getElementById("orderList");
-
-// Init Firebase first, then auth
 getFirebaseApp();
 
-firebase.auth().onAuthStateChanged(async (user) => {
-  if (!user) {
-    try {
-      await firebase.auth().signInAnonymously();
-    } catch (err) {
-      loading.innerHTML = `<p style="color:var(--dot-red);font-size:15px;">Could not connect. Please refresh the page.</p>`;
-      console.error("Auth error:", err);
-    }
-    return; // onAuthStateChanged fires again after sign-in
-  }
+const loading  = document.getElementById("loadingState");
+const empty    = document.getElementById("emptyState");
+const list     = document.getElementById("orderList");
+const errorDiv = document.getElementById("errorState");
+const errorMsg = document.getElementById("errorMsg");
 
-  const uid = user.uid;
-  const db  = firebase.firestore();
+function showError(msg) {
+  loading.style.display  = "none";
+  empty.style.display    = "none";
+  list.style.display     = "none";
+  errorDiv.style.display = "block";
+  errorMsg.textContent   = msg;
+}
+
+// Use getUserId() — same function used when placing order
+// This guarantees same UID because it uses LOCAL persistence
+getUserId().then(uid => {
+  console.log("[Status] Loading orders for UID:", uid);
+  const db = firebase.firestore();
 
   db.collection("orders")
     .where("userId", "==", uid)
-    .orderBy("createdAt", "desc")
     .onSnapshot((snap) => {
       loading.style.display = "none";
+      console.log("[Status] Got", snap.size, "orders");
+
       if (snap.empty) {
         empty.style.display = "block";
         list.style.display  = "none";
-      } else {
-        empty.style.display = "none";
-        list.style.display  = "block";
-        renderOrders(snap.docs);
+        return;
       }
+
+      empty.style.display = "none";
+      list.style.display  = "block";
+
+      // Sort client-side newest first
+      const docs = snap.docs.slice().sort((a, b) =>
+        (b.data().createdAt || "").localeCompare(a.data().createdAt || "")
+      );
+      renderOrders(docs);
     }, (err) => {
-      console.error("Firestore error:", err);
-      // Likely missing index — show empty state as fallback
-      loading.style.display = "none";
-      empty.style.display   = "block";
+      console.error("[Status] Firestore error:", err.code, err.message);
+      showError("Fehler: " + err.message);
     });
+
+}).catch(err => {
+  console.error("[Status] Auth error:", err);
+  showError("Auth-Fehler: " + err.message + " — Bitte Seite neu laden.");
 });
 
 function renderOrders(docs) {
@@ -95,51 +107,74 @@ function renderOrders(docs) {
     const d      = doc.data();
     const id     = doc.id;
     const status = d.status || "submitted";
-    const type   = (d.orderType || "GFX").replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase());
+    const type   = (d.orderType||"GFX").replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase());
     const date   = d.createdAt
-      ? new Date(d.createdAt).toLocaleDateString("de-DE", { day:"numeric", month:"short", year:"numeric" })
+      ? new Date(d.createdAt).toLocaleDateString("de-DE", {day:"numeric",month:"short",year:"numeric"})
       : "";
-
     const s = STATUS[status] || STATUS.submitted;
 
     return `
       <div class="order-item" id="item-${id}">
-        <div class="order-item-header" onclick="toggle('${id}')">
+        <div class="order-item-header" onclick="toggleItem('${id}', '${status}')">
           <span class="status-dot ${s.dot}"></span>
           <span class="order-item-title">${sanitize(d.title || "Untitled")}</span>
           <span class="order-item-type">${sanitize(type)}</span>
-          <svg style="margin-left:auto;color:var(--text-tertiary);transition:.2s" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="chevron-${id}"><path d="M6 9l6 6 6-6"/></svg>
+          <svg style="margin-left:auto;color:var(--text-tertiary);transition:.2s" id="chv-${id}" width="16" height="16"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
         </div>
         <div class="order-item-body">
           <p class="order-item-desc">${sanitize(d.description || "")}</p>
-          <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:12px;">
             <span class="status-label">
               <span class="status-dot ${s.dot}" style="width:8px;height:8px"></span>
               <strong>${s.label}</strong>
             </span>
             ${date ? `<span style="font-size:13px;color:var(--text-tertiary)">${date}</span>` : ""}
           </div>
-          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:${status === "done" ? "16px" : "0"}">${s.info}</p>
+          <p style="font-size:13px;color:var(--text-secondary)">${s.info}</p>
           ${d.additional ? `<p style="font-size:13px;color:var(--text-tertiary);margin-top:10px;padding-top:10px;border-top:1px solid var(--border-2)">Note: ${sanitize(d.additional)}</p>` : ""}
-          ${status === "done" && d.resultUrl ? `
-            <div class="done-result" style="margin-top:16px">
-              <img src="${sanitize(d.resultUrl)}" alt="Your GFX" onerror="this.style.display='none'" />
-              <div class="done-result-info">
-                <p class="done-result-name">Your GFX is ready! 🎉</p>
-                <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 12px">Download in full quality below.</p>
-                <a class="btn btn-primary btn-sm" href="${sanitize(d.resultUrl)}" target="_blank" download>Download &nbsp;⬇</a>
-              </div>
-            </div>` : ""}
+          <div id="result-${id}"></div>
         </div>
       </div>`;
   }).join("");
 }
 
-function toggle(id) {
+async function toggleItem(id, status) {
   const el  = document.getElementById("item-" + id);
-  const chv = document.getElementById("chevron-" + id);
-  el?.classList.toggle("open");
-  if (chv) chv.style.transform = el?.classList.contains("open") ? "rotate(180deg)" : "";
+  const chv = document.getElementById("chv-" + id);
+  const isOpen = el?.classList.toggle("open");
+  if (chv) chv.style.transform = isOpen ? "rotate(180deg)" : "";
+
+  if (isOpen && status === "done") {
+    const container = document.getElementById("result-" + id);
+    if (container && !container.dataset.loaded) {
+      container.dataset.loaded = "1";
+      container.innerHTML = `<div style="margin-top:16px;color:var(--text-tertiary);font-size:13px;">
+        <span class="spinner" style="width:14px;height:14px;margin-right:6px;color:var(--text-tertiary)"></span>Lade Ergebnis…</div>`;
+      try {
+        const db   = firebase.firestore();
+        const snap = await db.collection("orders").doc(id).collection("resultImage").limit(1).get();
+        if (!snap.empty) {
+          const img = snap.docs[0].data();
+          const src = `data:${img.type};base64,${img.data}`;
+          container.innerHTML = `
+            <div class="done-result" style="margin-top:16px">
+              <img src="${src}" alt="Your GFX" style="width:100px;height:66px;object-fit:cover;border-radius:8px;background:var(--bg-3)" />
+              <div class="done-result-info">
+                <p class="done-result-name">Your GFX is ready! 🎉</p>
+                <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 12px">Full quality download:</p>
+                <a class="btn btn-primary btn-sm" href="${src}" download="${sanitize(img.name||'gfx')}">Download &nbsp;⬇</a>
+              </div>
+            </div>`;
+        } else {
+          container.innerHTML = `<p style="margin-top:12px;font-size:13px;color:var(--text-tertiary)">Result image not found.</p>`;
+        }
+      } catch(e) {
+        console.error("[Status] Result load error:", e);
+        container.innerHTML = `<p style="margin-top:12px;font-size:13px;color:var(--dot-red)">Error: ${e.message}</p>`;
+      }
+    }
+  }
 }
 </script>
 </body>
